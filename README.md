@@ -1,6 +1,6 @@
-# iOS Ubuntu API Project 🚀
+# iOS Ubuntu API Project - LifeCoach iOS 🚀
 
-> A complete infrastructure solution for connecting iOS applications to a self-hosted Ubuntu server using Cloudflare Tunnel for secure, reliable remote access.
+> A complete infrastructure solution for connecting iOS applications to a self-hosted Ubuntu server using Cloudflare Tunnel for secure, reliable remote access. This instance is configured for the LifeCoach iOS application.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
@@ -169,13 +169,22 @@ Full API documentation: [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)
 
 ## 📊 Monitoring & Management
 
+### LifeCoach iOS API Server Status
+
+**✅ Server is running 24/7 with PM2**
+- Process name: `lifecoach-ios-api`
+- Port: 3000
+- Auto-start: Enabled
+- Self-healing: Enabled
+
 ### API Server Commands
 
 ```bash
-pm2 status           # View status
-pm2 logs ios-api     # View logs
-pm2 monit           # Real-time monitoring
-pm2 restart ios-api  # Restart server
+pm2 status                    # View all processes
+pm2 logs lifecoach-ios-api    # View logs
+pm2 monit                     # Real-time monitoring
+pm2 restart lifecoach-ios-api # Restart server
+pm2 info lifecoach-ios-api    # Detailed info
 ```
 
 ### Cloudflare Tunnel Commands
