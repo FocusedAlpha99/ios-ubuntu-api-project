@@ -29,9 +29,17 @@ ios_ubuntu_api_project/
 │   ├── ARCHITECTURE_OVERVIEW.md   # System architecture & decisions
 │   └── API_ENDPOINTS.md          # API reference documentation
 ├── server/                        # Ubuntu backend server
-│   ├── app.js                    # Express.js application
+│   ├── index.js                  # Project Swivel PTY engine (Express + Socket.io)
+│   ├── app.js                    # Legacy REST API
 │   ├── package.json              # Node.js dependencies
 │   └── .env.example              # Environment configuration
+├── project-swivel/
+│   ├── package.json              # Root orchestrator + concurrently scripts
+│   ├── package-lock.json
+│   ├── LAUNCH_SWIVEL.bat         # Double-click bootstrapper (server + client)
+│   ├── RESET_AND_REBUILD.bat     # Deletes server deps and reinstalls cleanly
+│   ├── AUTO_FIX_AND_BUILD.bat    # Installs VS components + rebuilds node-pty
+│   └── client/                   # React + Vite terminal UI (Project Swivel)
 ├── ios_templates/                # iOS client code
 │   ├── APIManager.swift         # API client with auth
 │   ├── WebSocketManager.swift   # WebSocket handler
@@ -71,6 +79,73 @@ curl https://api.yourdomain.com/api/health
 ```
 
 That's it! Your iOS app can now connect from anywhere.
+
+## 🖥️ Project Swivel PTY Engine
+
+`server/index.js` powers the interactive terminal streaming component that Project Swivel relies on for remote shell orchestration.
+
+- Runs an Express + Socket.io server on port **3001** with CORS temporarily open to `*` for rapid iteration.
+- Uses `os.platform()` to pick `powershell.exe` on Windows or `bash` on other platforms, and spawns an 80x30 PTY with `node-pty`.
+- Emits `terminal.output` events for every chunk of PTY data and writes any `terminal.input` payloads straight back to the shell.
+- Destroys the per-socket PTY process when a client disconnects to avoid zombie shells, and logs **CRITICAL ERROR** details if the native module fails to load.
+
+### Run locally
+
+```bash
+cd server
+npm install
+npm start
+```
+
+You should see `Swivel PTY server listening on http://localhost:3001` in the logs. A health probe is also exposed at `GET /health`.
+
+## 💻 Project Swivel Client
+
+`project-swivel/client` is a Vite + React terminal UI that streams I/O from the PTY engine in real time.
+
+- `src/components/Terminal.jsx` wires `xterm` + `xterm-addon-fit` to `socket.io-client`, emitting `terminal.input` events and rendering `terminal.output` as data arrives.
+- The component imports `xterm/css/xterm.css`, enables cursor blink, auto-focuses on mount, uses a `ResizeObserver` to stay perfectly fitted to its parent pane, and guards against double-initialization so it behaves nicely under React Strict Mode.
+- `vite.config.js` proxies `/socket.io` traffic to `http://localhost:3001`, eliminating CORS friction while developing locally.
+- `src/App.jsx` now presents the Swivel tri-pane layout: Gemini Chat (brain) on the left, the live terminal in the center, and agent context/state on the right, giving us a unified operator console.
+- Dev server convenience: `vite.config.js` also sets `server.open = true`, so the preferred browser launches automatically during development.
+
+### One-click launch (Windows)
+
+From `project-swivel/`, double-click `LAUNCH_SWIVEL.bat`. It installs any missing dependencies (root, `server`, `client`) and then runs `npm start`, which orchestrates both processes via `concurrently`.
+
+### Windows recovery scripts
+
+- `RESET_AND_REBUILD.bat` — removes `server/node_modules`, deletes the lock file, and reinstalls the backend dependencies. Use this if `node-pty` binaries came from WSL or became corrupted.
+- `AUTO_FIX_AND_BUILD.bat` — runs the Visual Studio installer in passive mode to add the Spectre-mitigated VC++ toolchain and Windows 10 SDK 19041, clears `%USERPROFILE%\.node-gyp`, and executes `npm install --build-from-source` in `server/`. Run this as Administrator if the reset script fails due to native build errors.
+- Both scripts pause at the end so you can review `node-gyp` output before closing the window.
+
+### Cross-platform dev start
+
+```bash
+cd project-swivel
+npm install        # installs concurrently + shared deps
+npm start          # runs server + client together
+```
+
+### Run locally
+
+```bash
+cd project-swivel/client
+npm install         # repeat after dependency changes
+npm run dev         # front-end only, if you are not using npm start above
+```
+
+If you skip the root orchestrator, remember to launch the PTY backend separately (`cd server && npm start`) before visiting `http://localhost:5173`.
+
+### Windows PTY fallback ladder
+
+`server/index.js` now attempts three strategies, in order:
+
+1. `node-pty` with native ConPTY bindings (best experience with full terminal control).
+2. `pty-wsl-fallback.js`, which proxies shell IO through `wsl.exe` when native modules are unavailable.
+3. A final `child_process` wrapper around `powershell.exe`, ensuring the client always receives interactive access even if both native and WSL PTYs fail.
+
+You’ll see log output indicating which backend is active (`Using node-pty…`, `Using WSL fallback…`, or `Using PowerShell child_process fallback…`). This makes it easy to verify that the auto-fix scripts worked.
 
 ## 📱 iOS Integration
 
@@ -314,4 +389,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for self-hosted enthusiasts**
 
-*Last Updated: September 21, 2025*
+*Last Updated: December 9, 2025*
